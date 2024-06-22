@@ -5,34 +5,43 @@ import https from 'https';
 import chalk from 'chalk';
 
 export let additionalTypes = '';
-export async function main() {
-    function createEnvLocalFile() {
 
+export async function main() {
+    const answers = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'baseUrl',
+            message: 'Please enter the base API URL:'
+        },
+        {
+            type: 'input',
+            name: 'endpoints',
+            message: 'Please enter the endpoints separated by commas (without leading slash):'
+        }
+    ]);
+
+    const { baseUrl, endpoints } = answers;
+    function createEnvLocalFile() {
         const envLocalPath = path.join(process.cwd(), '.env.local');
 
         try {
-          if (!fs.existsSync(envLocalPath)) {
-            const envContent = `# Variables d'environnement pour l'API\nAPI_URL=https://api.example.com\nAPI_KEY=your-api-key\n`;
-            fs.writeFileSync(envLocalPath, envContent);
-            console.log(`Fichier ${envLocalPath} créé avec succès !`);
-          } else {
-            console.log(`${envLocalPath} existe déjà.`);
-          }
+            if (!fs.existsSync(envLocalPath)) {
+                const envContent = `# Variables d'environnement pour l'API\nAPI_URL=${answers.baseUrl}\nAPI_KEY=your-api-key\n`;
+                fs.writeFileSync(envLocalPath, envContent);
+                console.log(`Fichier ${envLocalPath} créé avec succès !`);
+            } else {
+                console.log(`${envLocalPath} existe déjà.`);
+            }
         } catch (error) {
-          console.error(`Erreur lors de la création du répertoire : ${error.message}`);
+            console.error(`Erreur lors de la création du répertoire : ${error.message}`);
         }
-      }
-      
-      createEnvLocalFile();
-    inquirer.prompt([
-        {
-            type: 'input',
-            name: 'apiUrl',
-            message: 'Please enter the API URL:'
-        }
-    ]).then(answers => {
-        const { apiUrl } = answers;
-        const typeName = getTypeNameFromUrl(apiUrl);
+    }
+
+    createEnvLocalFile();
+    const endpointList = endpoints.split(',').map(endpoint => endpoint.trim());
+    for (const endpoint of endpointList) {
+        const apiUrl = `${baseUrl}/${endpoint}`;
+        const typeName = getTypeNameFromUrl(endpoint);
         https.get(apiUrl, (res) => {
             let data = '';
 
@@ -51,8 +60,7 @@ export async function main() {
         }).on('error', (err) => {
             console.error(`Error fetching API: ${err.message}`);
         });
-    });
-// }
+    }
 }
 
 export function getTypeNameFromUrl(url) {
@@ -93,6 +101,7 @@ export function generateTypesContent(data, typeName) {
     types += '};\n\n';
     return types;
 }
+
 export function getType(value, typeName, key) {
     if (value === null) {
         return 'any';
@@ -108,6 +117,7 @@ export function getType(value, typeName, key) {
         return typeof value;
     }
 }
+
 export function appendTypesToFile(content, filePath, typeName) {
     if (fs.existsSync(filePath)) {
         const existingContent = fs.readFileSync(filePath, 'utf8');
