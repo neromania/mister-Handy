@@ -18,8 +18,7 @@ figlet.text(
       console.dir(err);
       return;
     }
-    console.log(chalk.greenBright.bgBlack(data));
+    console.log('\n' + chalk.greenBright.bgBlack(data) + '\n');
   }
 );
-MrHandy()
 }

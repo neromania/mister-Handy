@@ -65,7 +65,7 @@ export async function createLibrary() {
         const relatedTypeName = foreignKey.replace(/Id$/, '');
         const methodName = `get${capitalizeFirstLetter(typeName)}sBy${capitalizeFirstLetter(relatedTypeName)}`;
         let methodContent = `export async function ${methodName}(${foreignKey}: number) {\n`;
-        methodContent += `  const res = await fetch('https://jsonplaceholder.typicode.com/${typeName.toLowerCase()}s?${foreignKey}=' + ${id});\n`;
+        methodContent += `  const res = await fetch('https://jsonplaceholder.typicode.com/${typeName.toLowerCase()}s?${foreignKey}=' + ${foreignKey});\n`;
         methodContent += `  if (!res.ok) throw new Error("Failed to fetch ${typeName.toLowerCase()}s for ${relatedTypeName} with id " + ${foreignKey});\n`;
         methodContent += `  return res.json();\n`;
         methodContent += `}\n`;

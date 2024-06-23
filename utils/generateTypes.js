@@ -7,16 +7,17 @@ import chalk from 'chalk';
 export let additionalTypes = '';
 
 export async function main() {
+
     const answers = await inquirer.prompt([
         {
             type: 'input',
             name: 'baseUrl',
-            message: 'Please enter the base API URL:'
+            message: '\n' +'Please enter the base API URL:'+'\n'
         },
         {
             type: 'input',
             name: 'endpoints',
-            message: 'Please enter the endpoints separated by commas (without leading slash):'
+            message: '\n'+'Please enter the endpoints separated by commas (without leading slash):'+'\n'
         }
     ]);
 

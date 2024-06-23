@@ -7,38 +7,6 @@
 //  * @author Ism TkL <takkalismail.ddns.net>
 //  */
 
-// import init from './utils/init.js';
-// import { cli } from './utils/cli.js';
-// import log from './utils/log.js';
-// import { main } from './utils/generateTypes.js';
-// import { createLibrary } from './utils/createLibrary.js';
-// import { generateRoutes } from './utils/generateRoutes.js';
-// import { generatePages } from './utils/generatePages.js';
-// import figlet from 'figlet';
-
-// const input = cli.input;
-// const flags = cli.flags;
-// const { clear, debug } = flags;
-
-// (async () => {
-// 	init({ clear });
-// 	input.includes(`help`) && cli.showHelp(0);
-// 	if (input.includes('create-types')) {
-// 		main();
-// 	}
-// 	if (input.includes('create-library')) {
-// 		createLibrary();
-// 	}
-// 	if (input.includes('generate-routes')) {
-// 		generateRoutes();
-// 	}
-// 	if (input.includes('generate-pages')) {
-// 		generatePages();
-// 	}
-// 	debug && log(flags);
-// })();
-
-
 import init from './utils/init.js';
 import { cli } from './utils/cli.js';
 import log from './utils/log.js';
@@ -46,10 +14,7 @@ import { main } from './utils/generateTypes.js';
 import { createLibrary } from './utils/createLibrary.js';
 import { generateRoutes } from './utils/generateRoutes.js';
 import { generatePages } from './utils/generatePages.js';
-import figlet from 'figlet';
-
-// Assurez-vous que la fonction MrHandy est importée
-import {MrHandy} from './utils/mrHandy.js';
+import { MrHandy } from './utils/mrHandy.js';
 
 const input = cli.input;
 const flags = cli.flags;
@@ -59,7 +24,11 @@ const { clear, debug, mrHandy } = flags;
 	init({ clear });
 	input.includes(`help`) && cli.showHelp(0);
 	if (input.includes('create-types')) {
-		await main();
+		MrHandy();
+		setTimeout(() => {
+        	 main();
+		}, 10);
+		
 	}
 	if (input.includes('create-library')) {
 		await createLibrary();
