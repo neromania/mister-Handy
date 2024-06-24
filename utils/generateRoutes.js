@@ -1,123 +1,82 @@
 import fs from 'fs';
 import path from 'path';
+import inquirer from 'inquirer';
+
 const filePath = path.join(process.cwd(), 'types.d.ts');
-	
-export async function generateRoutes() {
-    if (fs.existsSync(filePath)) {
-  // Chemin vers le fichier types.d.ts (à adapter selon votre structure)
-  
-  const typesFilePath = path.join(process.cwd(), 'types.d.ts');
-  
-  // Lire le contenu du fichier types.d.ts
 
-  const typesContent = fs.readFileSync(typesFilePath, 'utf-8');
-
-  // Extraire les noms des types (supposons qu'ils soient définis comme `type TypeName = ...`)
-
-  const typeNames = typesContent.match(/type (\w+)/g).map(match => match.split(' ')[1]);
-
-  // Chemin vers le dossier src/app/api
-  const apiDirPath = path.join(process.cwd(), 'src', 'app', 'api');
-
-  // Créer le dossier src/app/api s'il n'existe pas
-  if (!fs.existsSync(apiDirPath)) {
-    fs.mkdirSync(apiDirPath, { recursive: true });
-  }
-
-  // Créer un dossier pour chaque type
-  typeNames.forEach(typeName => {
-    const pluralTypeName = typeName.toLowerCase() + 's'; // Pluriel en minuscule
-    const typeDirPath = path.join(apiDirPath, pluralTypeName);
-
-    if (!fs.existsSync(typeDirPath)) {
-      fs.mkdirSync(typeDirPath);
-    }
-
-    // Créer un fichier route.ts dans chaque dossier avec les méthodes de fetching
-    const routeFilePath = path.join(typeDirPath, 'route.ts');
-    if (!fs.existsSync(routeFilePath)) {
-      const routeContent = generateRouteContent(typeName);
-      fs.writeFileSync(routeFilePath, routeContent);
-      console.log(`Fichier ${routeFilePath} créé avec succès !`);
-    }
-  });
-
-  console.log('Opération terminée !');
+function capitalizeFirstLetter(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function generateRouteContent(typeName) {
   return `
-import { NextResponse } from 'next/server';
+import axios from 'axios';
 
-const DATA_SOURCE_URL = 'https://jsonplaceholder.typicode.com/${typeName.toLowerCase()}s';
-const API_KEY: string = process.env.DATA_API_KEY as string;
+const API_URL = 'https://jsonplaceholder.typicode.com/${typeName.toLowerCase()}s';
 
-export async function GET() {
-  try {
-    const res = await fetch(DATA_SOURCE_URL);
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    return NextResponse.error('Failed to fetch data', 500);
-  }
-}
+export const get${typeName}s = async (): Promise<Post[]> => {
+  const response = await axios.get(API_URL);
+  return response.data;
+};
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const res = await fetch(DATA_SOURCE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'API-Key': API_KEY,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return NextResponse.json(data, 201);
-  } catch (error) {
-    console.error('Error creating data:', error);
-    return NextResponse.error('Failed to create data', 500);
-  }
-}
+export const get${typeName} = async (id: number): Promise<Post> => {
+  const response = await axios.get(\`\${API_URL}/\${id}\`);
+  return response.data;
+};
 
-export async function PUT(request: Request) {
-  try {
-    const body = await request.json();
-    const res = await fetch(\`\${DATA_SOURCE_URL}/\${body.id}\`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'API-Key': API_KEY,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    console.error('Error updating data:', error);
-    return NextResponse.error('Failed to update data', 500);
-  }
-}
+export const create${typeName} = async (post: Omit<Post, 'id'>): Promise<Post> => {
+  const response = await axios.post(API_URL, post);
+  return response.data;
+};
 
-export async function DELETE(request: Request) {
-  try {
-    const { id } = await request.json();
-    await fetch(\`\${DATA_SOURCE_URL}/\${id}\`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'API-Key': API_KEY,
-      },
-    });
-    return NextResponse.json({ message: \`Data with id \${id} deleted\` });
-  } catch (error) {
-    console.error('Error deleting data:', error);
-    return NextResponse.error('Failed to delete data', 500);
-  }
-}
+export const update${typeName} = async (id: number, post: Omit<Post, 'id'>): Promise<Post> => {
+  const response = await axios.put(\`\${API_URL}/\${id}\`, post);
+  return response.data;
+};
+
+export const delete${typeName} = async (id: number): Promise<void> => {
+  await axios.delete(\`\${API_URL}/\${id}\`);
+};
 `;
 }
+
+export async function generateRoutes() {
+  if (fs.existsSync(filePath)) {
+    const typesContent = fs.readFileSync(filePath, 'utf-8');
+    const typeNames = typesContent.match(/type (\w+)/g)?.map(match => match.split(' ')[1]) || [];
+    const apiDirPath = path.join(process.cwd(), 'src', 'app', 'api');
+
+    if (!fs.existsSync(apiDirPath)) {
+      fs.mkdirSync(apiDirPath, { recursive: true });
+    }
+
+    const { chosenType } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'chosenType',
+        message: 'Which type do you want to use for CRUD?',
+        choices: typeNames,
+      },
+    ]);
+
+    const capitalizedTypeName = capitalizeFirstLetter(chosenType);
+    const pluralTypeName = capitalizedTypeName.toLowerCase() + 's';
+    const typeDirPath = path.join(apiDirPath, pluralTypeName);
+
+    if (!fs.existsSync(typeDirPath)) {
+      fs.mkdirSync(typeDirPath, { recursive: true });
+    }
+
+    const routeFilePath = path.join(typeDirPath, 'route.ts');
+    if (!fs.existsSync(routeFilePath)) {
+      const routeContent = generateRouteContent(capitalizedTypeName);
+      fs.writeFileSync(routeFilePath, routeContent);
+      console.log(`File ${routeFilePath} successfully created for type ${capitalizedTypeName}!`);
+    }
+
+    console.log('Operation completed!');
+  }
 }
-generateRoutes();
+
+// Remove the direct call to generateRoutes()
+// generateRoutes();

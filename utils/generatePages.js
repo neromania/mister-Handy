@@ -1,29 +1,189 @@
 import fs from 'fs';
 import path from 'path';
+import inquirer from 'inquirer';
 
 const filePath = path.join(process.cwd(), 'types.d.ts');
 
+function capitalizeFirstLetter(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 function generateDynamicRouteContent(typeName) {
   return `
-import get${typeName}ById from '@/lib/${typeName}/get${typeName}ById';
+'use client';
 
-type Params = {
-  params: {
-    id: string;
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { get${typeName}, delete${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
+
+const ${typeName}Detail = ({ params }: { params: { id: string } }) => {
+  const [${typeName.toLowerCase()}, set${typeName}] = useState<${typeName} | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetch${typeName} = async () => {
+      const data = await get${typeName}(Number(params.id));
+      set${typeName}(data);
+    };
+
+    fetch${typeName}();
+  }, [params.id]);
+
+  const handleDelete = async () => {
+    if (${typeName.toLowerCase()}) {
+      await delete${typeName}(Number(${typeName.toLowerCase()}.id));
+      router.push('/');
+    }
   };
-};
 
-export default async function ${typeName}Page({ params: { id } }: Params) {
-  const ${typeName.toLowerCase()}Data: ${typeName} = await get${typeName}ById(id);
+  if (!${typeName.toLowerCase()}) return <div>Loading...</div>;
 
   return (
-    <>
-        <h1>Détails de ${typeName}</h1>
-        <p>ID: {${typeName.toLowerCase()}Data.id}</p>
-        <p>Nom: {${typeName.toLowerCase()}Data.name}</p>
-    </>
+    <div>
+      <h1>{${typeName.toLowerCase()}.title}</h1>
+      <p>{${typeName.toLowerCase()}.body}</p>
+      <button onClick={handleDelete}>Delete</button>
+      <button onClick={() => router.push(\`/${typeName.toLowerCase()}s/\${${typeName.toLowerCase()}.id}/edit\`)}>Edit</button>
+    </div>
   );
+};
+
+export default ${typeName}Detail;
+`;
 }
+
+function generateIndexPageContent(typeName) {
+  return `
+import Link from 'next/link';
+import { get${typeName}s } from '@/app/api/${typeName.toLowerCase()}s/route';
+
+const ${typeName}sPage = async () => {
+  const ${typeName.toLowerCase()}s: Post[] = await get${typeName}s();
+
+  return (
+    <div>
+      <h1>${typeName}s</h1>
+      <ul>
+        {${typeName.toLowerCase()}s.map((post) => (
+          <li key={post.id}>
+            <Link href={\`/${typeName.toLowerCase()}s/\${post.id}\`}>
+              <p>{post.title}</p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <Link href="/${typeName.toLowerCase()}s/create">
+        <p>Create New ${typeName}</p>
+      </Link>
+    </div>
+  );
+};
+
+export default ${typeName}sPage;
+`;
+}
+
+function generateCreatePageContent(typeName) {
+  return `
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { create${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
+
+const Create${typeName} = () => {
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await create${typeName}({ title, body, userId: 1 });
+    router.push('/${typeName.toLowerCase()}s');
+  };
+
+  return (
+    <div>
+      <h1>Create ${typeName}</h1>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <textarea
+          placeholder="Body"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <button type="submit">Create</button>
+      </form>
+    </div>
+  );
+};
+
+export default Create${typeName};
+`;
+}
+
+function generateEditPageContent(typeName) {
+  return `
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { get${typeName}, update${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
+
+const Edit${typeName} = () => {
+  const [${typeName.toLowerCase()}, set${typeName}] = useState<${typeName} | null>(null);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const router = useRouter();
+  const { id } = useParams();
+
+  useEffect(() => {
+    if (id) {
+      get${typeName}(Number(id)).then((data) => {
+        set${typeName}(data);
+        setTitle(data.title);
+        setBody(data.body);
+      });
+    }
+  }, [id]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (${typeName.toLowerCase()}) {
+      await update${typeName}(Number(${typeName.toLowerCase()}.id), { title, body, userId: ${typeName.toLowerCase()}.userId });
+      router.push('/${typeName.toLowerCase()}s');
+    }
+  };
+
+  if (!${typeName.toLowerCase()}) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <h1>Edit ${typeName}</h1>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <textarea
+          placeholder="Body"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <button type="submit">Update</button>
+      </form>
+    </div>
+  );
+};
+
+export default Edit${typeName};
 `;
 }
 
@@ -37,87 +197,67 @@ export async function generatePages() {
       fs.mkdirSync(appDirPath, { recursive: true });
     }
 
-    typeNames.forEach(typeName => {
-      const pluralTypeName = typeName.toLowerCase() + 's';
-      const typeDirPath = path.join(appDirPath, pluralTypeName);
+    const { chosenType } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'chosenType',
+        message: 'Which type do you want to use for CRUD?',
+        choices: typeNames,
+      },
+    ]);
 
-      if (!fs.existsSync(typeDirPath)) {
-        fs.mkdirSync(typeDirPath, { recursive: true });
-      }
+    const capitalizedTypeName = capitalizeFirstLetter(chosenType);
+    const pluralTypeName = capitalizedTypeName.toLowerCase() + 's';
+    const typeDirPath = path.join(appDirPath, pluralTypeName);
 
-      const dynamicRouteDirPath = path.join(typeDirPath, '[id]');
-      if (!fs.existsSync(dynamicRouteDirPath)) {
-        fs.mkdirSync(dynamicRouteDirPath, { recursive: true });
-      }
-
-      const dynamicRouteFilePath = path.join(dynamicRouteDirPath, 'page.tsx');
-      if (!fs.existsSync(dynamicRouteFilePath)) {
-        const dynamicRouteContent = generateDynamicRouteContent(typeName);
-        fs.writeFileSync(dynamicRouteFilePath, dynamicRouteContent);
-        console.log(`Fichier ${dynamicRouteFilePath} créé avec succès !`);
-      }
-
-      const indexFilePath = path.join(typeDirPath, 'page.tsx');
-      if (!fs.existsSync(indexFilePath)) {
-        const indexContent = generateIndexPageContent(typeName, typesContent);
-        fs.writeFileSync(indexFilePath, indexContent);
-        console.log(`Fichier ${indexFilePath} créé avec succès !`);
-      }
-    });
-
-    console.log('Opération terminée !');
-  }
-}
-
-function generateIndexPageContent(typeName, typesContent) {
-  const idKey = extractIdKey(typeName, typesContent);
-  return `
-import type { Metadata } from 'next';
-import getAll${typeName}s from '@/lib/${typeName}/getAll${typeName}s';
-import Link from 'next/link';
-
-export const metadata: Metadata = {
-  title: '${typeName}s',
-};
-
-export default async function ${typeName}sPage() {
-  const ${typeName.toLowerCase()}sData: Promise<${typeName}[]> = getAll${typeName}s();
-  const ${typeName.toLowerCase()}s = await ${typeName.toLowerCase()}sData;
-
- const content = (
-    <section>
-      <h2>
-        <Link href="/">Back to Home</Link>
-      </h2>
-      <br />
-      {${typeName.toLowerCase()}s.map(${typeName.toLowerCase()} => (
-        <div key={${typeName.toLowerCase()}.${idKey}}>
-          <p>
-            <Link href={\`/${typeName.toLowerCase()}s/\${${typeName.toLowerCase()}.${idKey}}\`}>
-              {${typeName.toLowerCase()}.name}
-            </Link>
-          </p>
-          <br />
-        </div>
-      ))}
-    </section>
-  );
-  return content;
-}
-`;
-}
-
-function extractIdKey(typeName, typesContent) {
-  const typeRegex = new RegExp(`type ${typeName} = {([^}]*)}`, 's');
-  const match = typesContent.match(typeRegex);
-  if (match) {
-    const typeDefinition = match[1];
-    const idMatch = typeDefinition.match(/(\w+): number;/);
-    if (idMatch) {
-      return idMatch[1];
+    if (!fs.existsSync(typeDirPath)) {
+      fs.mkdirSync(typeDirPath, { recursive: true });
     }
+
+    const dynamicRouteDirPath = path.join(typeDirPath, '[id]');
+    if (!fs.existsSync(dynamicRouteDirPath)) {
+      fs.mkdirSync(dynamicRouteDirPath, { recursive: true });
+    }
+
+    const dynamicRouteFilePath = path.join(dynamicRouteDirPath, 'page.tsx');
+    if (!fs.existsSync(dynamicRouteFilePath)) {
+      const dynamicRouteContent = generateDynamicRouteContent(capitalizedTypeName);
+      fs.writeFileSync(dynamicRouteFilePath, dynamicRouteContent);
+      console.log(`File ${dynamicRouteFilePath} successfully created for type ${capitalizedTypeName}!`);
+    }
+
+    const indexFilePath = path.join(typeDirPath, 'page.tsx');
+    if (!fs.existsSync(indexFilePath)) {
+      const indexContent = generateIndexPageContent(capitalizedTypeName);
+      fs.writeFileSync(indexFilePath, indexContent);
+      console.log(`File ${indexFilePath} successfully created for type ${capitalizedTypeName}!`);
+    }
+
+    const createDirPath = path.join(typeDirPath, 'create');
+    if (!fs.existsSync(createDirPath)) {
+      fs.mkdirSync(createDirPath, { recursive: true });
+    }
+
+    const createFilePath = path.join(createDirPath, 'page.tsx');
+    if (!fs.existsSync(createFilePath)) {
+      const createContent = generateCreatePageContent(capitalizedTypeName);
+      fs.writeFileSync(createFilePath, createContent);
+      console.log(`File ${createFilePath} successfully created for type ${capitalizedTypeName}!`);
+    }
+
+    const editDirPath = path.join(dynamicRouteDirPath, 'edit');
+    if (!fs.existsSync(editDirPath)) {
+      fs.mkdirSync(editDirPath, { recursive: true });
+    }
+
+    const editFilePath = path.join(editDirPath, 'page.tsx');
+    if (!fs.existsSync(editFilePath)) {
+      const editContent = generateEditPageContent(capitalizedTypeName);
+      fs.writeFileSync(editFilePath, editContent);
+      console.log(`File ${editFilePath} successfully created for type ${capitalizedTypeName}!`);
+    }
+
+    console.log('Operation completed!');
   }
-  return 'id';
 }
 
-generatePages();
