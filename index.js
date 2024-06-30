@@ -11,7 +11,6 @@ import init from './utils/init.js';
 import { cli } from './utils/cli.js';
 import log from './utils/log.js';
 import { main } from './utils/generateTypes.js';
-import { createLibrary } from './utils/createLibrary.js';
 import { generateRoutes } from './utils/generateRoutes.js';
 import { generatePages } from './utils/generatePages.js';
 import { MrHandy } from './utils/mrHandy.js';

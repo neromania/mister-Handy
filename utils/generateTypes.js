@@ -3,11 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import chalk from 'chalk';
-
 export let additionalTypes = '';
 
-export async function main() {
+const agent = new https.Agent({
+    rejectUnauthorized: false
+});
 
+export async function main() {
     const answers = await inquirer.prompt([
         {
             type: 'input',
@@ -22,12 +24,13 @@ export async function main() {
     ]);
 
     const { baseUrl, endpoints } = answers;
+
     function createEnvLocalFile() {
         const envLocalPath = path.join(process.cwd(), '.env.local');
 
         try {
             if (!fs.existsSync(envLocalPath)) {
-                const envContent = `# Variables d'environnement pour l'API\nAPI_URL=${answers.baseUrl}\nAPI_KEY=your-api-key\n`;
+                const envContent = `# Variables d'environnement pour l'API\nNEXT_PUBLIC_API_URL=${answers.baseUrl}\nAPI_KEY=your-api-key\n`;
                 fs.writeFileSync(envLocalPath, envContent);
                 console.log(`Fichier ${envLocalPath} créé avec succès !`);
             } else {
@@ -39,11 +42,12 @@ export async function main() {
     }
 
     createEnvLocalFile();
+
     const endpointList = endpoints.split(',').map(endpoint => endpoint.trim());
     for (const endpoint of endpointList) {
         const apiUrl = `${baseUrl}/${endpoint}`;
         const typeName = getTypeNameFromUrl(endpoint);
-        https.get(apiUrl, (res) => {
+        https.get(apiUrl, { agent }, (res) => {
             let data = '';
 
             res.on('data', (chunk) => {
@@ -109,7 +113,7 @@ export function getType(value, typeName, key) {
     } else if (Array.isArray(value)) {
         const singularTypeName = key.replace(/s$/, '');
         const arrayItemType = value.length > 0 ? getType(value[0], singularTypeName, '') : 'any';
-        return `${singularTypeName}[]`;
+        return `${arrayItemType}[]`;
     } else if (typeof value === 'object') {
         const nestedTypeName = `${typeName}${key.charAt(0).toUpperCase() + key.slice(1)}Type`;
         additionalTypes += generateTypesContent(value, nestedTypeName);

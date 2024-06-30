@@ -8,7 +8,14 @@ function capitalizeFirstLetter(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function generateDynamicRouteContent(typeName) {
+function generateDynamicRouteContent(typeName, properties) {
+  const propDisplay = properties.map(function(prop) {
+    const key = prop.split(':').map(function(p) {
+      return p.trim();
+    })[0];
+    return '<p>{' + typeName.toLowerCase() + '.' + key + '}</p>';
+  }).join('\n      ');
+
   return `
 'use client';
 
@@ -16,74 +23,174 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { get${typeName}, delete${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
 
-const ${typeName}Detail = ({ params }: { params: { id: string } }) => {
-  const [${typeName.toLowerCase()}, set${typeName}] = useState<${typeName} | null>(null);
+function ${typeName}Detail({ params }) {
+  const [${typeName.toLowerCase()}, set${typeName}] = useState(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetch${typeName} = async () => {
+  useEffect(function() {
+    async function fetch${typeName}() {
       const data = await get${typeName}(Number(params.id));
       set${typeName}(data);
-    };
+    }
 
     fetch${typeName}();
   }, [params.id]);
 
-  const handleDelete = async () => {
+  async function handleDelete() {
     if (${typeName.toLowerCase()}) {
       await delete${typeName}(Number(${typeName.toLowerCase()}.id));
       router.push('/');
     }
-  };
+  }
 
   if (!${typeName.toLowerCase()}) return <div>Loading...</div>;
 
   return (
     <div>
-      <h1>{${typeName.toLowerCase()}.title}</h1>
-      <p>{${typeName.toLowerCase()}.body}</p>
+      <h1>${typeName.toLowerCase()}s</h1>
+      ${propDisplay}
       <button onClick={handleDelete}>Delete</button>
-      <button onClick={() => router.push(\`/${typeName.toLowerCase()}s/\${${typeName.toLowerCase()}.id}/edit\`)}>Edit</button>
+      <button onClick={function() { router.push('/${typeName.toLowerCase()}s/' + ${typeName.toLowerCase()}.id + '/edit'); }}>Edit</button>
     </div>
   );
-};
+}
 
 export default ${typeName}Detail;
 `;
 }
 
-function generateIndexPageContent(typeName) {
+
+function generateIndexPageContent(typeName, properties) {
+  const propDisplay = properties.map(function(prop) {
+    const parts = prop.split(':').map(function(p) {
+      return p.trim();
+    });
+    const key = parts[0];
+    return `<td className="border px-4 py-2">{renderProperty(${typeName.toLowerCase()}, '${key}')}</td>`;
+  }).join('\n              ');
+
   return `
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { get${typeName}s } from '@/app/api/${typeName.toLowerCase()}s/route';
 
-const ${typeName}sPage = async () => {
-  const ${typeName.toLowerCase()}s: Post[] = await get${typeName}s();
+function ${typeName}sPage() {
+  const [${typeName.toLowerCase()}s, set${typeName}s] = useState<${typeName}[]>([]);
+
+  useEffect(() => {
+    async function fetch${typeName}s() {
+      const ${typeName.toLowerCase()}sData = await get${typeName}s();
+      set${typeName}s(${typeName.toLowerCase()}sData);
+    }
+
+    fetch${typeName}s();
+  }, []);
+
+  function renderProperty<T>(item: T, key: keyof T) {
+    const value = item[key];
+    if (Array.isArray(value)) {
+      return (
+        <ul className="list-disc list-inside">
+          {value.map((subItem, index) => (
+            <li key={index}>{subItem}</li>
+          ))}
+        </ul>
+      );
+    }
+    return <>{value}</>;
+  }
 
   return (
     <div>
       <h1>${typeName}s</h1>
-      <ul>
-        {${typeName.toLowerCase()}s.map((post) => (
-          <li key={post.id}>
-            <Link href={\`/${typeName.toLowerCase()}s/\${post.id}\`}>
-              <p>{post.title}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <table className="min-w-full bg-white">
+        <thead>
+          <tr>
+            <th className="border px-4 py-2">ID</th>
+            ${properties.map(function(prop) {
+              const key = prop.split(':').map(function(p) {
+                return p.trim();
+              })[0];
+              return `<th className="border px-4 py-2">${key}</th>`;
+            }).join('\n            ')}
+            <th className="border px-4 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {${typeName.toLowerCase()}s.map(function(${typeName.toLowerCase()}) {
+            return (
+              <tr key={${typeName.toLowerCase()}.id}>
+                <td className="border px-4 py-2">{${typeName.toLowerCase()}.id}</td>
+                ${propDisplay}
+                <td className="border px-4 py-2">
+                  <Link href={'/${typeName.toLowerCase()}s/' + ${typeName.toLowerCase()}.id}>
+                    <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Details</button>
+                  </Link>
+                  <Link href={'/${typeName.toLowerCase()}s/' + ${typeName.toLowerCase()}.id + '/edit'}>
+                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Edit</button>
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
       <Link href="/${typeName.toLowerCase()}s/create">
-        <p>Create New ${typeName}</p>
+        <button className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded mt-4">Create New ${typeName}</button>
       </Link>
     </div>
   );
-};
+}
 
 export default ${typeName}sPage;
 `;
 }
 
-function generateCreatePageContent(typeName) {
+
+function generateCreatePageContent(typeName, properties) {
+  const propInputs = properties.map(function(prop) {
+    const parts = prop.split(':').map(function(p) {
+      return p.trim();
+    });
+    const key = parts[0];
+    const type = parts[1];
+    if (type === 'string') {
+      return '<input type="text" placeholder="' + key + '" value={' + key + '} onChange={function(e) { set' + capitalizeFirstLetter(key) + '(e.target.value); }} />';
+    } else if (type === 'number') {
+      return '<input type="number" placeholder="' + key + '" value={' + key + '} onChange={function(e) { set' + capitalizeFirstLetter(key) + '(Number(e.target.value)); }} />';
+    } else if (type === 'string[]') {
+      return '<input type="text" placeholder="' + key + '" value={' + key + '.join(\',\')} onChange={function(e) { set' + capitalizeFirstLetter(key) + '(e.target.value.split(\',\')); }} />';
+    } else {
+      return '<input type="text" placeholder="' + key + '" value={' + key + '} onChange={function(e) { set' + capitalizeFirstLetter(key) + '(e.target.value); }} />';
+    }
+  }).join('\n        ');
+
+  const propStates = properties.map(function(prop) {
+    const parts = prop.split(':').map(function(p) {
+      return p.trim();
+    });
+    const key = parts[0];
+    const type = parts[1];
+    if (type === 'string') {
+      return 'const [' + key + ', set' + capitalizeFirstLetter(key) + '] = useState<string>(\'\');';
+    } else if (type === 'number') {
+      return 'const [' + key + ', set' + capitalizeFirstLetter(key) + '] = useState<number>(0);';
+    } else if (type === 'string[]') {
+      return 'const [' + key + ', set' + capitalizeFirstLetter(key) + '] = useState<string[]>([]);';
+    } else {
+      return 'const [' + key + ', set' + capitalizeFirstLetter(key) + '] = useState<string>(\'\');';
+    }
+  }).join('\n  ');
+
+  const propValues = properties.map(function(prop) {
+    const key = prop.split(':').map(function(p) {
+      return p.trim();
+    })[0];
+    return key;
+  }).join(', ');
+
   return `
 'use client';
 
@@ -91,43 +198,73 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { create${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
 
-const Create${typeName} = () => {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+function Create${typeName}() {
+  ${propStates}
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    await create${typeName}({ title, body, userId: 1 });
+    await create${typeName}({ ${propValues} });
     router.push('/${typeName.toLowerCase()}s');
-  };
+  }
 
   return (
     <div>
       <h1>Create ${typeName}</h1>
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          placeholder="Body"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
+        ${propInputs}
         <button type="submit">Create</button>
       </form>
     </div>
   );
-};
+}
 
 export default Create${typeName};
 `;
 }
 
-function generateEditPageContent(typeName) {
+function generateEditPageContent(typeName, properties) {
+  const propInputs = properties.map(function(prop) {
+    const parts = prop.split(':').map(function(p) {
+      return p.trim();
+    });
+    const key = parts[0];
+    const type = parts[1];
+    if (type === 'string') {
+      return `<input type="text" placeholder="${key}" value={${key}} onChange={(e) => set${capitalizeFirstLetter(key)}(e.target.value)} />`;
+    } else if (type === 'number') {
+      return `<input type="number" placeholder="${key}" value={${key}} onChange={(e) => set${capitalizeFirstLetter(key)}(Number(e.target.value))} />`;
+    } else if (type === 'string[]') {
+      return `<input type="text" placeholder="${key}" value={${key}.join(',')} onChange={(e) => set${capitalizeFirstLetter(key)}(e.target.value.split(','))} />`;
+    } else {
+      return `<input type="text" placeholder="${key}" value={${key}} onChange={(e) => set${capitalizeFirstLetter(key)}(e.target.value)} />`;
+    }
+  }).join('\n        ');
+
+  const propStates = properties.map(function(prop) {
+    const parts = prop.split(':').map(function(p) {
+      return p.trim();
+    });
+    const key = parts[0];
+    const type = parts[1];
+    if (type === 'string') {
+      return `const [${key}, set${capitalizeFirstLetter(key)}] = useState<string>('');`;
+    } else if (type === 'number') {
+      return `const [${key}, set${capitalizeFirstLetter(key)}] = useState<number>(0);`;
+    } else if (type === 'string[]') {
+      return `const [${key}, set${capitalizeFirstLetter(key)}] = useState<string[]>([]);`;
+    } else {
+      return `const [${key}, set${capitalizeFirstLetter(key)}] = useState<string>('');`;
+    }
+  }).join('\n  ');
+
+  const propValues = properties.map(function(prop) {
+    const key = prop.split(':').map(function(p) {
+      return p.trim();
+    })[0];
+    return key;
+  }).join(', ');
+
   return `
 'use client';
 
@@ -135,30 +272,47 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { get${typeName}, update${typeName} } from '@/app/api/${typeName.toLowerCase()}s/route';
 
-const Edit${typeName} = () => {
+interface Params {
+  [key: string]: string;
+}
+
+function Edit${typeName}() {
+  ${propStates}
   const [${typeName.toLowerCase()}, set${typeName}] = useState<${typeName} | null>(null);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams<Params>();
 
   useEffect(() => {
-    if (id) {
-      get${typeName}(Number(id)).then((data) => {
+    if (params.id) {
+      get${typeName}(Number(params.id)).then((data) => {
         set${typeName}(data);
-        setTitle(data.title);
-        setBody(data.body);
+        ${properties.map(function(prop) {
+          const parts = prop.split(':').map(function(p) {
+            return p.trim();
+          });
+          const key = parts[0];
+          const type = parts[1];
+          if (type === 'string') {
+            return `set${capitalizeFirstLetter(key)}(data.${key});`;
+          } else if (type === 'number') {
+            return `set${capitalizeFirstLetter(key)}(Number(data.${key}));`;
+          } else if (type === 'string[]') {
+            return `set${capitalizeFirstLetter(key)}(data.${key});`;
+          } else {
+            return `set${capitalizeFirstLetter(key)}(data.${key});`;
+          }
+        }).join('\n        ')}
       });
     }
-  }, [id]);
+  }, [params.id]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (${typeName.toLowerCase()}) {
-      await update${typeName}(Number(${typeName.toLowerCase()}.id), { title, body, userId: ${typeName.toLowerCase()}.userId });
+      await update${typeName}(Number(${typeName.toLowerCase()}.id), { ${propValues} });
       router.push('/${typeName.toLowerCase()}s');
     }
-  };
+  }
 
   if (!${typeName.toLowerCase()}) return <div>Loading...</div>;
 
@@ -166,38 +320,31 @@ const Edit${typeName} = () => {
     <div>
       <h1>Edit ${typeName}</h1>
       <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          placeholder="Body"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
+        ${propInputs}
         <button type="submit">Update</button>
       </form>
     </div>
   );
-};
+}
 
 export default Edit${typeName};
 `;
 }
 
+
 export async function generatePages() {
   if (fs.existsSync(filePath)) {
     const typesContent = fs.readFileSync(filePath, 'utf-8');
-    const typeNames = typesContent.match(/type (\w+)/g)?.map(match => match.split(' ')[1]) || [];
+    const typeNames = typesContent.match(/type (\w+)/g).map(function(match) {
+      return match.split(' ')[1];
+    }) || [];
     const appDirPath = path.join(process.cwd(), 'src', 'app');
 
     if (!fs.existsSync(appDirPath)) {
       fs.mkdirSync(appDirPath, { recursive: true });
     }
 
-    const { chosenType } = await inquirer.prompt([
+    const answers = await inquirer.prompt([
       {
         type: 'list',
         name: 'chosenType',
@@ -206,6 +353,7 @@ export async function generatePages() {
       },
     ]);
 
+    const chosenType = answers.chosenType;
     const capitalizedTypeName = capitalizeFirstLetter(chosenType);
     const pluralTypeName = capitalizedTypeName.toLowerCase() + 's';
     const typeDirPath = path.join(appDirPath, pluralTypeName);
@@ -221,16 +369,22 @@ export async function generatePages() {
 
     const dynamicRouteFilePath = path.join(dynamicRouteDirPath, 'page.tsx');
     if (!fs.existsSync(dynamicRouteFilePath)) {
-      const dynamicRouteContent = generateDynamicRouteContent(capitalizedTypeName);
+      const properties = typesContent.match(new RegExp('type ' + chosenType + ' = {([^}]*)}', 's'))[1].trim().split('\n').map(function(line) {
+        return line.trim();
+      });
+      const dynamicRouteContent = generateDynamicRouteContent(capitalizedTypeName, properties);
       fs.writeFileSync(dynamicRouteFilePath, dynamicRouteContent);
-      console.log(`File ${dynamicRouteFilePath} successfully created for type ${capitalizedTypeName}!`);
+      console.log('File ' + dynamicRouteFilePath + ' successfully created for type ' + capitalizedTypeName + '!');
     }
 
     const indexFilePath = path.join(typeDirPath, 'page.tsx');
     if (!fs.existsSync(indexFilePath)) {
-      const indexContent = generateIndexPageContent(capitalizedTypeName);
+      const properties = typesContent.match(new RegExp('type ' + chosenType + ' = {([^}]*)}', 's'))[1].trim().split('\n').map(function(line) {
+        return line.trim();
+      });
+      const indexContent = generateIndexPageContent(capitalizedTypeName, properties);
       fs.writeFileSync(indexFilePath, indexContent);
-      console.log(`File ${indexFilePath} successfully created for type ${capitalizedTypeName}!`);
+      console.log('File ' + indexFilePath + ' successfully created for type ' + capitalizedTypeName + '!');
     }
 
     const createDirPath = path.join(typeDirPath, 'create');
@@ -240,9 +394,12 @@ export async function generatePages() {
 
     const createFilePath = path.join(createDirPath, 'page.tsx');
     if (!fs.existsSync(createFilePath)) {
-      const createContent = generateCreatePageContent(capitalizedTypeName);
+      const properties = typesContent.match(new RegExp('type ' + chosenType + ' = {([^}]*)}', 's'))[1].trim().split('\n').map(function(line) {
+        return line.trim();
+      });
+      const createContent = generateCreatePageContent(capitalizedTypeName, properties);
       fs.writeFileSync(createFilePath, createContent);
-      console.log(`File ${createFilePath} successfully created for type ${capitalizedTypeName}!`);
+      console.log('File ' + createFilePath + ' successfully created for type ' + capitalizedTypeName + '!');
     }
 
     const editDirPath = path.join(dynamicRouteDirPath, 'edit');
@@ -252,12 +409,14 @@ export async function generatePages() {
 
     const editFilePath = path.join(editDirPath, 'page.tsx');
     if (!fs.existsSync(editFilePath)) {
-      const editContent = generateEditPageContent(capitalizedTypeName);
+      const properties = typesContent.match(new RegExp('type ' + chosenType + ' = {([^}]*)}', 's'))[1].trim().split('\n').map(function(line) {
+        return line.trim();
+      });
+      const editContent = generateEditPageContent(capitalizedTypeName, properties);
       fs.writeFileSync(editFilePath, editContent);
-      console.log(`File ${editFilePath} successfully created for type ${capitalizedTypeName}!`);
+      console.log('File ' + editFilePath + ' successfully created for type ' + capitalizedTypeName + '!');
     }
 
     console.log('Operation completed!');
   }
 }
-
