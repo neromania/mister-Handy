@@ -8,7 +8,7 @@
     "mister-handy": "index.js",
     "cook": "index.js"
   },
-  "author": "Ism TkL <takkalismael@gmail.com> (https://takkalismail.ddns.net)",
+  "author": "Ism TkL <offneroman@gmail.com>",
   "keywords": [
     "mister-handy",
     "Ism TkL"
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.7",
+    "openapi-typescript": "^7.0.1",
     "prettier": "^3.3.2"
   },
   "main": "index.js",

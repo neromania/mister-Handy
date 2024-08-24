@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import chalk from 'chalk';
+import { exec } from 'child_process';
 export let additionalTypes = '';
 
 const agent = new https.Agent({
@@ -14,16 +15,34 @@ export async function main() {
         {
             type: 'input',
             name: 'baseUrl',
-            message: '\n' +'Please enter the base API URL:'+'\n'
+            message: '\n' + 'Please enter the base API URL:' + '\n'
+        },
+        {
+            type: 'confirm',
+            name: 'hasToken',
+            message: '\n' + 'Does this API require an authentication token?' + '\n',
+            default: false
+        },
+        {
+            type: 'input',
+            name: 'token',
+            message: '\n' + 'Please enter the authentication token:' + '\n',
+            when: (answers) => answers.hasToken
         },
         {
             type: 'input',
             name: 'endpoints',
-            message: '\n'+'Please enter the endpoints separated by commas (without leading slash):'+'\n'
+            message: '\n' + 'Please enter the endpoints separated by commas (without leading slash):' + '\n',
+            when: (answers) => !answers.hasToken
+        },
+        {
+            type: 'input',
+            name: 'openApiUrl',
+            message: '\n' + 'Please enter the OpenAPI documentation URL (if available):' + '\n'
         }
     ]);
 
-    const { baseUrl, endpoints } = answers;
+    const { baseUrl, endpoints, hasToken, token, openApiUrl } = answers;
 
     function createEnvLocalFile() {
         const envLocalPath = path.join(process.cwd(), '.env.local');
@@ -43,29 +62,53 @@ export async function main() {
 
     createEnvLocalFile();
 
-    const endpointList = endpoints.split(',').map(endpoint => endpoint.trim());
-    for (const endpoint of endpointList) {
-        const apiUrl = `${baseUrl}/${endpoint}`;
-        const typeName = getTypeNameFromUrl(endpoint);
-        https.get(apiUrl, { agent }, (res) => {
-            let data = '';
+    if (openApiUrl) {
+        generateTypesFromOpenApi(openApiUrl);
+    } else if (endpoints) {
+        const endpointList = endpoints.split(',').map(endpoint => endpoint.trim());
+        for (const endpoint of endpointList) {
+            const apiUrl = `${baseUrl}/${endpoint}`;
+            const typeName = getTypeNameFromUrl(endpoint);
+            const options = {
+                agent,
+                headers: hasToken ? { 'Authorization': `Bearer ${token}` } : {}
+            };
 
-            res.on('data', (chunk) => {
-                data += chunk;
+            https.get(apiUrl, options, (res) => {
+                let data = '';
+
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+
+                res.on('end', () => {
+                    const response = JSON.parse(data);
+                    const typesContent = generateTypesContent(response, typeName);
+                    const filePath = path.join(process.cwd(), 'types.d.ts');
+                    appendTypesToFile(typesContent + additionalTypes, filePath, typeName);
+                    console.log(`Types written to: ${filePath}`);
+                });
+
+            }).on('error', (err) => {
+                console.error(`Error fetching API: ${err.message}`);
             });
-
-            res.on('end', () => {
-                const response = JSON.parse(data);
-                const typesContent = generateTypesContent(response, typeName);
-                const filePath = path.join(process.cwd(), 'types.d.ts');
-                appendTypesToFile(typesContent + additionalTypes, filePath, typeName);
-                console.log(`Types written to: ${filePath}`);
-            });
-
-        }).on('error', (err) => {
-            console.error(`Error fetching API: ${err.message}`);
-        });
+        }
     }
+}
+
+function generateTypesFromOpenApi(openApiUrl) {
+    const outputPath = path.join(process.cwd(), 'types.d.ts');
+    exec(`npx openapi-typescript ${openApiUrl} -o ${outputPath}`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error generating types from OpenAPI: ${error.message}`);
+            return;
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return;
+        }
+        console.log(`Types generated from OpenAPI documentation and written to: ${outputPath}`);
+    });
 }
 
 export function getTypeNameFromUrl(url) {
