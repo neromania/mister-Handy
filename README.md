@@ -1,5 +1,8 @@
 # Mister Handy
 
+![Mr. Handy Logo application](logoMrHandy.png)
+![Mr. Handy Logo from the game](cookhandy.png)
+
 **Mister Handy** is a powerful command-line interface designed to streamline and enhance the development workflow. With a focus on API consumption and rapid testing, Mister Handy provides developers with a suite of tools for generating controllers, templates, and forms, making it an indispensable asset for modern web development.
 
 ## Features
